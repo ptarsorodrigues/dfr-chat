@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  phone             String
+  password          String
+  role              String   // ADMINISTRADOR, DIRETORIA, DENTISTA, RECEPCIONISTA, VENDAS, ASB, LIMPEZA, LABORATORIO
+  active            Boolean  @default(true)
+  mustChangePassword Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  sentMessages      Message[]          @relation("SentMessages")
+  recipients        MessageRecipient[]
+  edits             MessageEdit[]
+  auditLogs         AuditLog[]
+  pinnedMessages    PinnedMessage[]
+  backups           Backup[]
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  siso          String?  // Código do paciente (opcional)
+  paciente      String?  // Nome do paciente (opcional)
+  dentistaId    String?  // Dentista específico ou null = todos do grupo
+  dataConsulta  DateTime?
+  dataLimite    DateTime?
+  conteudo      String
+  prioridade    String   @default("NORMAL") // NORMAL, URGENTE, CRITICA
+  categoria     String   @default("ADMINISTRATIVO") // CLINICO, ADMINISTRATIVO, FINANCEIRO, URGENCIA
+  status        String   @default("ATIVA") // ATIVA, ARQUIVADA, CANCELADA
+  edited        Boolean  @default(false)
+  remetenteId   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  remetente     User               @relation("SentMessages", fields: [remetenteId], references: [id])
+  recipients    MessageRecipient[]
+  attachments   MessageAttachment[]
+  editHistory   MessageEdit[]
+  pinned        PinnedMessage[]
+}
+
+model MessageRecipient {
+  id        String    @id @default(cuid())
+  messageId String
+  userId    String?   // Usuário específico ou null (quando é para grupo)
+  groupName String?   // Nome do grupo destinatário
+  readAt    DateTime?
+  readConfirmed Boolean @default(false) // Acuse de recebimento confirmado
+
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User?   @relation(fields: [userId], references: [id])
+
+  @@index([messageId, userId])
+  @@index([messageId, groupName])
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  fileName  String
+  filePath  String
+  fileType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model MessageEdit {
+  id              String   @id @default(cuid())
+  messageId       String
+  userId          String
+  previousContent String
+  newContent      String
+  fieldChanged    String   @default("conteudo")
+  editedAt        DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   // MESSAGE_CREATED, MESSAGE_READ, MESSAGE_EDITED, etc.
+  entityType String   // MESSAGE, USER, SYSTEM
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model PinnedMessage {
+  id        String   @id @default(cuid())
+  messageId String
+  groupName String
+  pinnedBy  String
+  pinnedAt  DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [pinnedBy], references: [id])
+
+  @@unique([messageId, groupName])
+}
+
+model Backup {
+  id        String   @id @default(cuid())
+  userId    String
+  fileName  String
+  fileSize  Int
+  type      String   // EXPORT, IMPORT
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
