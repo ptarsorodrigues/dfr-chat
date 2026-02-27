@@ -187,11 +187,15 @@ export default function MessagesPage() {
                                 <div className="form-row">
                                     <div className="form-group">
                                         <label className="form-label">Data Consulta</label>
-                                        <input className="form-input" type="date" value={form.dataConsulta} onChange={e => setForm(f => ({ ...f, dataConsulta: e.target.value }))} />
+                                        <div className="date-input-wrapper">
+                                            <input className="form-input" type="date" value={form.dataConsulta} onChange={e => setForm(f => ({ ...f, dataConsulta: e.target.value }))} />
+                                        </div>
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Data Limite</label>
-                                        <input className="form-input" type="date" value={form.dataLimite} onChange={e => setForm(f => ({ ...f, dataLimite: e.target.value }))} />
+                                        <div className="date-input-wrapper">
+                                            <input className="form-input" type="date" value={form.dataLimite} onChange={e => setForm(f => ({ ...f, dataLimite: e.target.value }))} />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="form-group">
