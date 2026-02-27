@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
             // Create attachment record with file data stored in database
             const attachment = await prisma.messageAttachment.create({
                 data: {
-                    messageId: messageId || 'pending',
+                    messageId: messageId || undefined,
                     fileName: file.name,
                     filePath: `/api/upload/${Date.now()}`, // Will be updated with actual ID
                     fileType: file.type || 'application/octet-stream',

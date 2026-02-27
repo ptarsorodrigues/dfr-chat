@@ -67,7 +67,7 @@ model MessageRecipient {
 
 model MessageAttachment {
   id        String   @id @default(cuid())
-  messageId String
+  messageId String?
   fileName  String
   filePath  String
   fileType  String
@@ -75,7 +75,7 @@ model MessageAttachment {
   fileData  Bytes?
   createdAt DateTime @default(now())
 
-  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
 
 model MessageEdit {
