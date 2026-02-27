@@ -94,7 +94,7 @@ export default function AppShell() {
             {/* Main content */}
             <main className="main-content">
                 <div className="page-container">
-                    {page === 'dashboard' && <Dashboard />}
+                    {page === 'dashboard' && <Dashboard onNavigate={navigate} />}
                     {page === 'messages' && <MessagesPage />}
                     {page === 'users' && <UsersPage />}
                     {page === 'audit' && <AuditPage />}
