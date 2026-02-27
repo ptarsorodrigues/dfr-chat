@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
             categoria = 'ADMINISTRATIVO',
             recipientUserIds = [],
             recipientGroups = [],
+            attachmentIds = [],
         } = body;
 
         if (!conteudo) {
