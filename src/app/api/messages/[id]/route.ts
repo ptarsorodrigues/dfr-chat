@@ -27,7 +27,9 @@ export async function GET(
                         user: { select: { id: true, name: true, role: true } },
                     },
                 },
-                attachments: true,
+                attachments: {
+                    select: { id: true, fileName: true, fileType: true, fileSize: true, filePath: true },
+                },
                 editHistory: {
                     include: {
                         user: { select: { id: true, name: true } },

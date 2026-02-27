@@ -192,6 +192,14 @@ export async function POST(request: NextRequest) {
             },
         });
 
+        // Link uploaded attachments to this message
+        if (attachmentIds && attachmentIds.length > 0) {
+            await prisma.messageAttachment.updateMany({
+                where: { id: { in: attachmentIds } },
+                data: { messageId: message.id },
+            });
+        }
+
         await createAuditLog({
             userId: currentUser.userId,
             action: 'MESSAGE_CREATED',

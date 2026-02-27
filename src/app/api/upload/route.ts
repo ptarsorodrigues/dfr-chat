@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { randomUUID } from 'crypto';
 
-// POST /api/upload - Upload files and create attachment records
+// POST /api/upload - Upload files and store in database
 export async function POST(request: NextRequest) {
     try {
         const currentUser = getUserFromRequest(request);
@@ -21,39 +18,34 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'Nenhum arquivo enviado' }, { status: 400 });
         }
 
-        // Ensure uploads directory exists
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-        await mkdir(uploadsDir, { recursive: true });
-
         const attachments = [];
 
         for (const file of files) {
             const bytes = await file.arrayBuffer();
             const buffer = Buffer.from(bytes);
 
-            // Generate unique filename
-            const ext = path.extname(file.name);
-            const uniqueName = `${randomUUID()}${ext}`;
-            const filePath = path.join(uploadsDir, uniqueName);
-
-            // Write file to disk
-            await writeFile(filePath, buffer);
-
-            // Create attachment record
+            // Create attachment record with file data stored in database
             const attachment = await prisma.messageAttachment.create({
                 data: {
                     messageId: messageId || 'pending',
                     fileName: file.name,
-                    filePath: `/uploads/${uniqueName}`,
+                    filePath: `/api/upload/${Date.now()}`, // Will be updated with actual ID
                     fileType: file.type || 'application/octet-stream',
                     fileSize: buffer.length,
+                    fileData: buffer,
                 },
+            });
+
+            // Update filePath to point to the download endpoint
+            await prisma.messageAttachment.update({
+                where: { id: attachment.id },
+                data: { filePath: `/api/upload/${attachment.id}` },
             });
 
             attachments.push({
                 id: attachment.id,
                 fileName: attachment.fileName,
-                filePath: attachment.filePath,
+                filePath: `/api/upload/${attachment.id}`,
                 fileType: attachment.fileType,
                 fileSize: attachment.fileSize,
             });

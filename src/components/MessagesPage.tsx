@@ -6,6 +6,11 @@ import { ROLES, ROLE_LABELS } from '@/types';
 import MessageDetailModal from './MessageDetailModal';
 import DatePicker from './DatePicker';
 
+function getTodayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function MessagesPage() {
     const { api, user } = useAuth();
     const { showToast } = useToast();
@@ -20,9 +25,13 @@ export default function MessagesPage() {
     const [viewMsg, setViewMsg] = useState<any>(null);
     const [filters, setFilters] = useState({ search: '', prioridade: '', categoria: '', siso: '', paciente: '' });
 
-    // Compose state
+    // File upload state
+    const [files, setFiles] = useState<File[]>([]);
+    const [uploading, setUploading] = useState(false);
+
+    // Compose state — date fields default to today
     const [form, setForm] = useState({
-        conteudo: '', siso: '', paciente: '', dentistaId: '', dataConsulta: '', dataLimite: '',
+        conteudo: '', siso: '', paciente: '', dentistaId: '', dataConsulta: getTodayStr(), dataLimite: getTodayStr(),
         prioridade: 'NORMAL', categoria: 'ADMINISTRATIVO', recipientGroups: [] as string[], recipientUserIds: [] as string[],
     });
 
@@ -57,12 +66,42 @@ export default function MessagesPage() {
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await api('/api/messages', { method: 'POST', body: JSON.stringify(form) });
+            let attachmentIds: string[] = [];
+
+            // Upload files first if any
+            if (files.length > 0) {
+                setUploading(true);
+                const formData = new FormData();
+                files.forEach(f => formData.append('files', f));
+
+                const uploadRes = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    },
+                    body: formData,
+                });
+                const uploadData = await uploadRes.json();
+                setUploading(false);
+
+                if (!uploadData.success) {
+                    showToast(uploadData.error || 'Erro ao enviar arquivos', 'error');
+                    return;
+                }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                attachmentIds = uploadData.data.map((a: any) => a.id);
+            }
+
+            const res = await api('/api/messages', {
+                method: 'POST',
+                body: JSON.stringify({ ...form, attachmentIds }),
+            });
             const data = await res.json();
             if (data.success) {
                 showToast('Mensagem enviada!', 'success');
                 setShowCompose(false);
-                setForm({ conteudo: '', siso: '', paciente: '', dentistaId: '', dataConsulta: '', dataLimite: '', prioridade: 'NORMAL', categoria: 'ADMINISTRATIVO', recipientGroups: [], recipientUserIds: [] });
+                setForm({ conteudo: '', siso: '', paciente: '', dentistaId: '', dataConsulta: getTodayStr(), dataLimite: getTodayStr(), prioridade: 'NORMAL', categoria: 'ADMINISTRATIVO', recipientGroups: [], recipientUserIds: [] });
+                setFiles([]);
                 fetchMessages();
             } else showToast(data.error, 'error');
         } catch { showToast('Erro ao enviar', 'error'); }
@@ -79,6 +118,28 @@ export default function MessagesPage() {
                 ? f.recipientGroups.filter(g => g !== group)
                 : [...f.recipientGroups, group],
         }));
+    };
+
+    const handleFileDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        const dropped = Array.from(e.dataTransfer.files);
+        setFiles(prev => [...prev, ...dropped]);
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
     return (
@@ -210,10 +271,49 @@ export default function MessagesPage() {
                                     <label className="form-label">Conteúdo *</label>
                                     <textarea className="form-textarea" value={form.conteudo} onChange={e => setForm(f => ({ ...f, conteudo: e.target.value }))} placeholder="Digite sua mensagem..." required />
                                 </div>
+
+                                {/* File Upload Section */}
+                                <div className="form-group">
+                                    <label className="form-label">📎 Anexos</label>
+                                    <div
+                                        className="file-upload-zone"
+                                        onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+                                        onDragLeave={e => { e.currentTarget.classList.remove('drag-over'); }}
+                                        onDrop={e => { e.currentTarget.classList.remove('drag-over'); handleFileDrop(e); }}
+                                        onClick={() => document.getElementById('file-input')?.click()}
+                                    >
+                                        <div className="file-upload-icon">📁</div>
+                                        <div className="file-upload-text">Arraste arquivos aqui ou clique para selecionar</div>
+                                        <div className="file-upload-hint">Qualquer tipo de arquivo • Máx. 10MB por arquivo</div>
+                                        <input
+                                            id="file-input"
+                                            type="file"
+                                            multiple
+                                            onChange={handleFileSelect}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </div>
+                                    {files.length > 0 && (
+                                        <div className="file-list">
+                                            {files.map((f, i) => (
+                                                <div key={i} className="file-item">
+                                                    <span className="file-item-icon">
+                                                        {f.type.startsWith('image/') ? '🖼️' : f.type === 'application/pdf' ? '📄' : '📁'}
+                                                    </span>
+                                                    <span className="file-item-name">{f.name}</span>
+                                                    <span className="file-item-size">{formatFileSize(f.size)}</span>
+                                                    <button type="button" className="file-item-remove" onClick={(e) => { e.stopPropagation(); removeFile(i); }}>✕</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowCompose(false)}>Cancelar</button>
-                                <button type="submit" className="btn btn-primary">📤 Enviar</button>
+                                <button type="submit" className="btn btn-primary" disabled={uploading}>
+                                    {uploading ? '⏳ Enviando arquivos...' : '📤 Enviar'}
+                                </button>
                             </div>
                         </form>
                     </div>

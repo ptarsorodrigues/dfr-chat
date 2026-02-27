@@ -5,6 +5,8 @@ import React from 'react';
 export default function MessageDetailModal({ message, onClose, api, onRead }: { message: any; onClose: () => void; api: (url: string, options?: RequestInit) => Promise<Response>; onRead?: () => void }) {
     const [msg, setMsg] = React.useState(message);
     const [loading, setLoading] = React.useState(!message?.editHistory);
+    const [previewAttachment, setPreviewAttachment] = React.useState<{ id: string; fileName: string; fileType: string; fileSize: number } | null>(null);
+    const [previewPos, setPreviewPos] = React.useState({ x: 0, y: 0 });
 
     React.useEffect(() => {
         if (!message?.id) return;
@@ -20,6 +22,53 @@ export default function MessageDetailModal({ message, onClose, api, onRead }: { 
             setLoading(false);
         })();
     }, [message?.id, api, onRead]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleAttachmentHover = (e: React.MouseEvent, attachment: any) => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setPreviewPos({ x: rect.right + 12, y: rect.top });
+        setPreviewAttachment(attachment);
+    };
+
+    const handleAttachmentLeave = () => {
+        setPreviewAttachment(null);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleDownload = async (attachment: any) => {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/upload/${attachment.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = attachment.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const getFileIcon = (fileType: string) => {
+        if (fileType.startsWith('image/')) return '🖼️';
+        if (fileType === 'application/pdf') return '📄';
+        if (fileType.includes('word') || fileType.includes('document')) return '📝';
+        if (fileType.includes('sheet') || fileType.includes('excel')) return '📊';
+        if (fileType.includes('presentation') || fileType.includes('powerpoint')) return '📑';
+        if (fileType.startsWith('video/')) return '🎬';
+        if (fileType.startsWith('audio/')) return '🎵';
+        if (fileType.includes('zip') || fileType.includes('rar') || fileType.includes('compressed')) return '📦';
+        return '📁';
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const isImageType = (fileType: string) => fileType.startsWith('image/');
+    const isPdfType = (fileType: string) => fileType === 'application/pdf';
 
     if (!msg) return null;
 
@@ -50,6 +99,65 @@ export default function MessageDetailModal({ message, onClose, api, onRead }: { 
                             <div className="card" style={{ marginBottom: 16 }}>
                                 <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{msg.conteudo}</p>
                             </div>
+
+                            {/* Attachments Section */}
+                            {msg.attachments?.length > 0 && (
+                                <div style={{ marginBottom: 16 }}>
+                                    <strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>📎 Anexos ({msg.attachments.length}):</strong>
+                                    <div className="attachment-list">
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {msg.attachments.map((att: any) => (
+                                            <div
+                                                key={att.id}
+                                                className="attachment-item"
+                                                onMouseEnter={(e) => handleAttachmentHover(e, att)}
+                                                onMouseLeave={handleAttachmentLeave}
+                                                onClick={() => handleDownload(att)}
+                                            >
+                                                <span className="attachment-icon">{getFileIcon(att.fileType)}</span>
+                                                <span className="attachment-name">{att.fileName}</span>
+                                                <span className="attachment-size">{formatFileSize(att.fileSize)}</span>
+                                                <span className="attachment-download">⬇️</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Hover Preview Tooltip */}
+                            {previewAttachment && (
+                                <div
+                                    className="attachment-preview-tooltip"
+                                    style={{
+                                        position: 'fixed',
+                                        left: Math.min(previewPos.x, window.innerWidth - 340),
+                                        top: Math.min(previewPos.y, window.innerHeight - 300),
+                                    }}
+                                >
+                                    {isImageType(previewAttachment.fileType) ? (
+                                        <img
+                                            src={`/api/upload/${previewAttachment.id}?preview=true`}
+                                            alt={previewAttachment.fileName}
+                                            className="preview-image"
+                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        />
+                                    ) : isPdfType(previewAttachment.fileType) ? (
+                                        <div className="preview-file-info">
+                                            <div className="preview-file-icon">📄</div>
+                                            <div className="preview-file-name">{previewAttachment.fileName}</div>
+                                            <div className="preview-file-detail">{formatFileSize(previewAttachment.fileSize)}</div>
+                                            <div className="preview-file-detail">Clique para baixar</div>
+                                        </div>
+                                    ) : (
+                                        <div className="preview-file-info">
+                                            <div className="preview-file-icon">{getFileIcon(previewAttachment.fileType)}</div>
+                                            <div className="preview-file-name">{previewAttachment.fileName}</div>
+                                            <div className="preview-file-detail">{formatFileSize(previewAttachment.fileSize)}</div>
+                                            <div className="preview-file-detail">Clique para baixar</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {msg.recipients?.length > 0 && (
                                 <div style={{ marginBottom: 16 }}>
