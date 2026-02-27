@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import DatePicker from './DatePicker';
 
 export default function AuditPage() {
     const { api } = useAuth();
@@ -57,8 +58,8 @@ export default function AuditPage() {
                     <option value="">Todos tipos</option>
                     <option value="MESSAGE">Mensagem</option><option value="USER">Usuário</option><option value="SYSTEM">Sistema</option><option value="BACKUP">Backup</option>
                 </select>
-                <div className="date-input-wrapper"><input className="form-input" type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} /></div>
-                <div className="date-input-wrapper"><input className="form-input" type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} /></div>
+                <DatePicker value={filters.dateFrom} onChange={v => setFilters(f => ({ ...f, dateFrom: v }))} placeholder="Data início" />
+                <DatePicker value={filters.dateTo} onChange={v => setFilters(f => ({ ...f, dateTo: v }))} placeholder="Data fim" />
             </div>
 
             {loading ? <div className="loading-overlay"><div className="loading-spinner" /></div> : (

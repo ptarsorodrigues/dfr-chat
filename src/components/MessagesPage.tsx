@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/lib/ToastContext';
 import { ROLES, ROLE_LABELS } from '@/types';
 import MessageDetailModal from './MessageDetailModal';
+import DatePicker from './DatePicker';
 
 export default function MessagesPage() {
     const { api, user } = useAuth();
@@ -187,15 +188,11 @@ export default function MessagesPage() {
                                 <div className="form-row">
                                     <div className="form-group">
                                         <label className="form-label">Data Consulta</label>
-                                        <div className="date-input-wrapper">
-                                            <input className="form-input" type="date" value={form.dataConsulta} onChange={e => setForm(f => ({ ...f, dataConsulta: e.target.value }))} />
-                                        </div>
+                                        <DatePicker value={form.dataConsulta} onChange={v => setForm(f => ({ ...f, dataConsulta: v }))} placeholder="Selecione a data" />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Data Limite</label>
-                                        <div className="date-input-wrapper">
-                                            <input className="form-input" type="date" value={form.dataLimite} onChange={e => setForm(f => ({ ...f, dataLimite: e.target.value }))} />
-                                        </div>
+                                        <DatePicker value={form.dataLimite} onChange={v => setForm(f => ({ ...f, dataLimite: v }))} placeholder="Selecione a data" />
                                     </div>
                                 </div>
                                 <div className="form-group">
