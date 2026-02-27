@@ -28,10 +28,14 @@ export default function BackupPage() {
         try {
             const res = await api('/api/backup/export');
             const blob = await res.blob();
+            // Extract filename from Content-Disposition header to match what's stored in DB
+            const disposition = res.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename="?([^"]+)"?/);
+            const fileName = match?.[1] || `dfrchat-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `dfrchat-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = fileName;
             a.click();
             URL.revokeObjectURL(url);
             showToast('Backup exportado com sucesso!', 'success');
