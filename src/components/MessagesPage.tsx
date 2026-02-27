@@ -77,7 +77,7 @@ export default function MessagesPage() {
                 const uploadRes = await fetch('/api/upload', {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Authorization': `Bearer ${localStorage.getItem('dfr-token')}`,
                     },
                     body: formData,
                 });

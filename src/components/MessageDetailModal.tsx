@@ -36,7 +36,7 @@ export default function MessageDetailModal({ message, onClose, api, onRead }: { 
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleDownload = async (attachment: any) => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('dfr-token');
         const res = await fetch(`/api/upload/${attachment.id}`, {
             headers: { 'Authorization': `Bearer ${token}` },
         });
