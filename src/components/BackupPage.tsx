@@ -31,7 +31,7 @@ export default function BackupPage() {
             // Extract filename from Content-Disposition header to match what's stored in DB
             const disposition = res.headers.get('Content-Disposition') || '';
             const match = disposition.match(/filename="?([^"]+)"?/);
-            const fileName = match?.[1] || `dfrchat-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            const fileName = match?.[1] || `dfrchat-backup-${new Date().toISOString().slice(0, 10)}.json`;
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

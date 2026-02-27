@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
         // Record backup in DB
         const jsonString = JSON.stringify(backupData, null, 2);
-        const fileName = `dfrchat-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        const fileName = `dfrchat-backup-${new Date().toISOString().slice(0, 10)}.json`;
 
         await prisma.backup.create({
             data: {
