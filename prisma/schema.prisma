@@ -36,7 +36,7 @@ model Message {
   dataLimite    DateTime?
   conteudo      String
   prioridade    String   @default("NORMAL") // NORMAL, URGENTE, CRITICA
-  categoria     String   @default("ADMINISTRATIVO") // CLINICO, ADMINISTRATIVO, FINANCEIRO, URGENCIA
+  categoria     String   @default("ADMINISTRATIVO") // CLINICO, ADMINISTRATIVO, FINANCEIRO
   status        String   @default("ATIVA") // ATIVA, ARQUIVADA, CANCELADA
   edited        Boolean  @default(false)
   remetenteId   String

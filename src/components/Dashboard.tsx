@@ -17,14 +17,12 @@ const CATEGORY_LABELS: Record<string, string> = {
     CLINICO: 'Clínico',
     ADMINISTRATIVO: 'Administrativo',
     FINANCEIRO: 'Financeiro',
-    URGENCIA: 'Urgência',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
     CLINICO: '#06b6d4',
     ADMINISTRATIVO: '#3b82f6',
     FINANCEIRO: '#10b981',
-    URGENCIA: '#f59e0b',
 };
 
 const PRIORITY_LABELS: Record<string, string> = {

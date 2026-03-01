@@ -14,7 +14,7 @@ export type Role = (typeof ROLES)[number];
 export const PRIORITIES = ['NORMAL', 'URGENTE', 'CRITICA'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
-export const CATEGORIES = ['CLINICO', 'ADMINISTRATIVO', 'FINANCEIRO', 'URGENCIA'] as const;
+export const CATEGORIES = ['CLINICO', 'ADMINISTRATIVO', 'FINANCEIRO'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 export const MESSAGE_STATUS = ['ATIVA', 'ARQUIVADA', 'CANCELADA'] as const;
@@ -108,5 +108,4 @@ export const CATEGORY_LABELS: Record<Category, string> = {
     CLINICO: 'Clínico',
     ADMINISTRATIVO: 'Administrativo',
     FINANCEIRO: 'Financeiro',
-    URGENCIA: 'Urgência',
 };

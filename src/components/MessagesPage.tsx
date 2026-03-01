@@ -170,7 +170,6 @@ export default function MessagesPage() {
                     <option value="CLINICO">Clínico</option>
                     <option value="ADMINISTRATIVO">Administrativo</option>
                     <option value="FINANCEIRO">Financeiro</option>
-                    <option value="URGENCIA">Urgência</option>
                 </select>
                 <input className="form-input" placeholder="SISO" value={filters.siso} onChange={e => setFilters(f => ({ ...f, siso: e.target.value }))} style={{ maxWidth: 120 }} />
                 <input className="form-input" placeholder="Paciente" value={filters.paciente} onChange={e => setFilters(f => ({ ...f, paciente: e.target.value }))} style={{ maxWidth: 160 }} />
@@ -242,7 +241,6 @@ export default function MessagesPage() {
                                             <option value="CLINICO">Clínico</option>
                                             <option value="ADMINISTRATIVO">Administrativo</option>
                                             <option value="FINANCEIRO">Financeiro</option>
-                                            <option value="URGENCIA">Urgência</option>
                                         </select>
                                     </div>
                                 </div>
@@ -259,7 +257,7 @@ export default function MessagesPage() {
                                 <div className="form-group">
                                     <label className="form-label">Destinatários (grupos)</label>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                        {ROLES.filter(r => r !== 'ADMINISTRADOR').map(role => (
+                                        {ROLES.map(role => (
                                             <button type="button" key={role} className={`badge badge-${form.recipientGroups.includes(role) ? 'accent' : 'neutral'}`}
                                                 style={{ cursor: 'pointer', padding: '6px 14px' }} onClick={() => toggleGroup(role)}>
                                                 {ROLE_LABELS[role]}
