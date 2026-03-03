@@ -284,6 +284,7 @@ export async function DELETE(
 
         const now = new Date();
 
+        // Cancel the target message
         await prisma.message.update({
             where: { id },
             data: {
@@ -293,6 +294,35 @@ export async function DELETE(
             },
         });
 
+        // Cascade: cancel all descendant messages (replies & forwards)
+        const descendantIds: string[] = [];
+        let currentBatch = [id];
+        while (currentBatch.length > 0) {
+            const children = await prisma.message.findMany({
+                where: {
+                    parentMessageId: { in: currentBatch },
+                    status: { not: 'CANCELADA' },
+                },
+                select: { id: true },
+            });
+            const childIds = children.map(c => c.id);
+            if (childIds.length === 0) break;
+            descendantIds.push(...childIds);
+            currentBatch = childIds;
+        }
+
+        if (descendantIds.length > 0) {
+            await prisma.message.updateMany({
+                where: { id: { in: descendantIds } },
+                data: {
+                    status: 'CANCELADA',
+                    cancelledById: currentUser.userId,
+                    cancelledAt: now,
+                },
+            });
+        }
+
+        const totalCancelled = 1 + descendantIds.length;
         const roleLabel = hasPrivilege && !isAuthor
             ? `privilégio ${currentUser.role.toLowerCase()}`
             : 'autor';
@@ -302,13 +332,15 @@ export async function DELETE(
             action: 'MESSAGE_DELETED',
             entityType: 'MESSAGE',
             entityId: id,
-            details: `Mensagem cancelada por ${currentUser.name} (${roleLabel}) em ${now.toLocaleString('pt-BR')}`,
+            details: `Mensagem cancelada por ${currentUser.name} (${roleLabel}) em ${now.toLocaleString('pt-BR')}${totalCancelled > 1 ? ` — ${totalCancelled - 1} mensagens relacionadas também canceladas` : ''}`,
             ipAddress: getClientIP(request),
         });
 
         return NextResponse.json({
             success: true,
-            message: 'Mensagem removida com sucesso',
+            message: totalCancelled > 1
+                ? `Mensagem e ${totalCancelled - 1} resposta(s)/encaminhamento(s) removidos`
+                : 'Mensagem removida com sucesso',
         });
     } catch (error) {
         console.error('Delete message error:', error);
