@@ -50,7 +50,7 @@ export default function AppShell() {
 
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-                <div className="sidebar-logo">
+                <div className="sidebar-logo" onClick={() => navigate('dashboard')} style={{ cursor: 'pointer' }}>
                     <div className="sidebar-logo-icon">💬</div>
                     <span className="sidebar-logo-text">DFR CHAT</span>
                 </div>
