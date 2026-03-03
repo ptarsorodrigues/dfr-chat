@@ -244,7 +244,7 @@ export default function MessagesPage() {
                 <select className="form-select" value={filters.prioridade} onChange={e => setFilters(f => ({ ...f, prioridade: e.target.value }))}>
                     <option value="">Prioridade</option>
                     <option value="NORMAL">Normal</option>
-                    <option value="URGENTE">Urgente</option>
+                    <option value="URGENTE">Importante</option>
                     <option value="CRITICA">Crítica</option>
                 </select>
                 <select className="form-select" value={filters.categoria} onChange={e => setFilters(f => ({ ...f, categoria: e.target.value }))}>
@@ -313,7 +313,7 @@ export default function MessagesPage() {
                                         <label className="form-label">Prioridade</label>
                                         <select className="form-select" value={form.prioridade} onChange={e => setForm(f => ({ ...f, prioridade: e.target.value }))}>
                                             <option value="NORMAL">Normal</option>
-                                            <option value="URGENTE">Urgente</option>
+                                            <option value="URGENTE">Importante</option>
                                             <option value="CRITICA">Crítica</option>
                                         </select>
                                     </div>

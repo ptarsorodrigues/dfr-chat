@@ -28,7 +28,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const PRIORITY_LABELS: Record<string, string> = {
     NORMAL: 'Normal',
-    URGENTE: 'Urgente',
+    URGENTE: 'Importante',
     CRITICA: 'Crítica',
 };
 
@@ -108,7 +108,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (page: string) 
                 <div className="stat-card warning" onClick={() => onNavigate?.('messages')} style={{ cursor: 'pointer' }}>
                     <div className="stat-icon">⚡</div>
                     <div className="stat-value">{stats.urgentMessages}</div>
-                    <div className="stat-label">Urgentes</div>
+                    <div className="stat-label">Importantes</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer', borderTop: '3px solid #ef4444' }} onClick={() => onNavigate?.('messages')}>
                     <div className="stat-icon" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>🚨</div>

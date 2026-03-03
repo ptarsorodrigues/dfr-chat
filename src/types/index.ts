@@ -100,7 +100,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
     NORMAL: 'Normal',
-    URGENTE: 'Urgente',
+    URGENTE: 'Importante',
     CRITICA: 'Crítica',
 };
 
