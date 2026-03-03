@@ -1,12 +1,18 @@
 'use client';
 import React from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import { useToast } from '@/lib/ToastContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function MessageDetailModal({ message, onClose, api, onRead }: { message: any; onClose: () => void; api: (url: string, options?: RequestInit) => Promise<Response>; onRead?: () => void }) {
+    const { user } = useAuth();
+    const { showToast } = useToast();
     const [msg, setMsg] = React.useState(message);
     const [loading, setLoading] = React.useState(!message?.editHistory);
     const [previewAttachment, setPreviewAttachment] = React.useState<{ id: string; fileName: string; fileType: string; fileSize: number } | null>(null);
     const [previewPos, setPreviewPos] = React.useState({ x: 0, y: 0 });
+    const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+    const [deleting, setDeleting] = React.useState(false);
 
     React.useEffect(() => {
         if (!message?.id) return;
@@ -22,6 +28,34 @@ export default function MessageDetailModal({ message, onClose, api, onRead }: { 
             setLoading(false);
         })();
     }, [message?.id, api, onRead]);
+
+    // Check if user can delete this message
+    const canDelete = React.useMemo(() => {
+        if (!msg || !user) return false;
+        const isAuthor = msg.remetenteId === user.id;
+        const isPrivileged = user.role === 'ADMINISTRADOR' || user.role === 'DIRETORIA';
+        return isAuthor || isPrivileged;
+    }, [msg, user]);
+
+    const handleDelete = async () => {
+        if (!msg?.id) return;
+        setDeleting(true);
+        try {
+            const res = await api(`/api/messages/${msg.id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Mensagem removida com sucesso', 'success');
+                if (onRead) onRead();
+                onClose();
+            } else {
+                showToast(data.error || 'Erro ao remover mensagem', 'error');
+            }
+        } catch {
+            showToast('Erro ao remover mensagem', 'error');
+        }
+        setDeleting(false);
+        setShowDeleteConfirm(false);
+    };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleAttachmentHover = (e: React.MouseEvent, attachment: any) => {
@@ -77,16 +111,74 @@ export default function MessageDetailModal({ message, onClose, api, onRead }: { 
             <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
                 <div className="modal-header">
                     <h2 className="modal-title">Detalhes da Mensagem</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {canDelete && msg.status !== 'CANCELADA' && (
+                            <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => setShowDeleteConfirm(true)}
+                                title="Remover mensagem"
+                            >
+                                🗑️ Remover
+                            </button>
+                        )}
+                        <button className="modal-close" onClick={onClose}>×</button>
+                    </div>
                 </div>
                 <div className="modal-body">
                     {loading ? <div className="loading-spinner" /> : (
                         <>
+                            {/* Delete Confirmation Dialog */}
+                            {showDeleteConfirm && (
+                                <div style={{
+                                    background: 'var(--danger-bg)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    borderRadius: 'var(--radius)',
+                                    padding: 16,
+                                    marginBottom: 16,
+                                    animation: 'fadeIn 0.2s ease',
+                                }}>
+                                    <div style={{ fontWeight: 700, marginBottom: 8, color: 'var(--danger)' }}>
+                                        ⚠️ Confirmar Remoção
+                                    </div>
+                                    <div style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-secondary)' }}>
+                                        Esta ação irá cancelar a mensagem. Ela não será mais visível para os destinatários, mas permanecerá registrada no log de auditoria.
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button className="btn btn-danger btn-sm" onClick={handleDelete} disabled={deleting}>
+                                            {deleting ? '⏳ Removendo...' : '🗑️ Confirmar Remoção'}
+                                        </button>
+                                        <button className="btn btn-secondary btn-sm" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cancelled message notice */}
+                            {msg.status === 'CANCELADA' && (
+                                <div style={{
+                                    background: 'var(--danger-bg)',
+                                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                                    borderRadius: 'var(--radius)',
+                                    padding: 12,
+                                    marginBottom: 16,
+                                    fontSize: 13,
+                                }}>
+                                    <span style={{ color: 'var(--danger)', fontWeight: 700 }}>🚫 Mensagem Removida</span>
+                                    {msg.cancelledBy && (
+                                        <span style={{ color: 'var(--text-secondary)' }}> por {msg.cancelledBy.name}</span>
+                                    )}
+                                    {msg.cancelledAt && (
+                                        <span style={{ color: 'var(--text-muted)' }}> em {new Date(msg.cancelledAt).toLocaleString('pt-BR')}</span>
+                                    )}
+                                </div>
+                            )}
+
                             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                                 <span className={`badge badge-${msg.prioridade === 'CRITICA' ? 'danger' : msg.prioridade === 'URGENTE' ? 'warning' : 'accent'}`}>{msg.prioridade}</span>
                                 <span className="badge badge-accent">{msg.categoria}</span>
                                 {msg.edited && <span className="badge badge-warning">ALTERADA</span>}
-                                <span className="badge badge-neutral">{msg.status}</span>
+                                <span className={`badge badge-${msg.status === 'CANCELADA' ? 'danger' : 'neutral'}`}>{msg.status}</span>
                             </div>
                             <div style={{ marginBottom: 16, fontSize: 14, lineHeight: 1.8 }}>
                                 <div><strong>De:</strong> {msg.remetente?.name} ({msg.remetente?.role})</div>

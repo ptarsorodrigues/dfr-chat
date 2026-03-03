@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
             criticalMessages,
             totalUsers,
             activeUsers,
-            recentMessages,
+            directedMessages,
             readStats,
             messagesByCategory,
             messagesByPriority,
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
             prisma.user.count(),
             // Active users
             prisma.user.count({ where: { active: true } }),
-            // Recent messages (last 10)
+            // Directed messages for the user — chronological order, last 30
             prisma.message.findMany({
                 where: {
                     status: 'ATIVA',
@@ -95,12 +95,15 @@ export async function GET(request: NextRequest) {
                                 { groupName: currentUser.role },
                             ],
                         },
-                        select: { readAt: true },
+                        select: { readAt: true, userId: true, groupName: true },
                     },
-                    _count: { select: { attachments: true } },
+                    attachments: {
+                        select: { id: true, fileName: true, fileType: true, fileSize: true },
+                    },
+                    _count: { select: { editHistory: true, attachments: true } },
                 },
                 orderBy: { createdAt: 'desc' },
-                take: 10,
+                take: 30,
             }),
             // Read rate
             prisma.messageRecipient.groupBy({
@@ -136,7 +139,7 @@ export async function GET(request: NextRequest) {
                     totalUsers,
                     activeUsers,
                 },
-                recentMessages,
+                directedMessages,
                 readStats,
                 messagesByCategory,
                 messagesByPriority,

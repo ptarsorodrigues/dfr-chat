@@ -29,6 +29,12 @@ export default function MessagesPage() {
     const [files, setFiles] = useState<File[]>([]);
     const [uploading, setUploading] = useState(false);
 
+    // Group member selection state
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [groupMembers, setGroupMembers] = useState<Record<string, any[]>>({});
+    const [selectedMembers, setSelectedMembers] = useState<Record<string, string[]>>({});
+    const [loadingMembers, setLoadingMembers] = useState<Record<string, boolean>>({});
+
     // Compose state — date fields default to today
     const [form, setForm] = useState({
         conteudo: '', siso: '', paciente: '', dentistaId: '', dataConsulta: getTodayStr(), dataLimite: getTodayStr(),
@@ -63,6 +69,26 @@ export default function MessagesPage() {
     useEffect(() => { fetchMessages(); }, [fetchMessages]);
     useEffect(() => { if (user?.role === 'ADMINISTRADOR') fetchUsers(); }, [fetchUsers, user]);
 
+    // Fetch members when a group is selected
+    const fetchGroupMembers = useCallback(async (role: string) => {
+        setLoadingMembers(prev => ({ ...prev, [role]: true }));
+        try {
+            const res = await api(`/api/users/by-role?roles=${role}`);
+            const data = await res.json();
+            if (data.success) {
+                setGroupMembers(prev => ({ ...prev, [role]: data.data }));
+                // Default: all members selected
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                setSelectedMembers(prev => ({ ...prev, [role]: data.data.map((u: any) => u.id) }));
+            } else {
+                showToast(data.error || 'Erro ao buscar membros do grupo', 'error');
+            }
+        } catch {
+            showToast('Erro ao buscar membros do grupo', 'error');
+        }
+        setLoadingMembers(prev => ({ ...prev, [role]: false }));
+    }, [api, showToast]);
+
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -92,9 +118,33 @@ export default function MessagesPage() {
                 attachmentIds = uploadData.data.map((a: any) => a.id);
             }
 
+            // Build final recipient lists based on member selections
+            const finalGroups: string[] = [];
+            const finalUserIds: string[] = [...form.recipientUserIds];
+
+            for (const group of form.recipientGroups) {
+                const members = groupMembers[group] || [];
+                const selected = selectedMembers[group] || [];
+
+                if (members.length === 0 || selected.length === members.length) {
+                    // All selected or no members loaded → send to entire group
+                    finalGroups.push(group);
+                } else if (selected.length > 0) {
+                    // Specific members selected → send to individual users
+                    for (const uid of selected) {
+                        if (!finalUserIds.includes(uid)) {
+                            finalUserIds.push(uid);
+                        }
+                    }
+                }
+                // If selected.length === 0, skip this group entirely
+            }
+
+            const sendForm = { ...form, recipientGroups: finalGroups, recipientUserIds: finalUserIds };
+
             const res = await api('/api/messages', {
                 method: 'POST',
-                body: JSON.stringify({ ...form, attachmentIds }),
+                body: JSON.stringify({ ...sendForm, attachmentIds }),
             });
             const data = await res.json();
             if (data.success) {
@@ -102,6 +152,8 @@ export default function MessagesPage() {
                 setShowCompose(false);
                 setForm({ conteudo: '', siso: '', paciente: '', dentistaId: '', dataConsulta: getTodayStr(), dataLimite: getTodayStr(), prioridade: 'NORMAL', categoria: 'ADMINISTRATIVO', recipientGroups: [], recipientUserIds: [] });
                 setFiles([]);
+                setGroupMembers({});
+                setSelectedMembers({});
                 fetchMessages();
             } else showToast(data.error, 'error');
         } catch { showToast('Erro ao enviar', 'error'); }
@@ -112,11 +164,41 @@ export default function MessagesPage() {
     };
 
     const toggleGroup = (group: string) => {
+        const isRemoving = form.recipientGroups.includes(group);
         setForm(f => ({
             ...f,
-            recipientGroups: f.recipientGroups.includes(group)
+            recipientGroups: isRemoving
                 ? f.recipientGroups.filter(g => g !== group)
                 : [...f.recipientGroups, group],
+        }));
+        if (isRemoving) {
+            // Clean up member data for this group
+            setGroupMembers(prev => { const n = { ...prev }; delete n[group]; return n; });
+            setSelectedMembers(prev => { const n = { ...prev }; delete n[group]; return n; });
+        } else {
+            // Fetch members for the newly selected group
+            fetchGroupMembers(group);
+        }
+    };
+
+    const toggleMember = (group: string, userId: string) => {
+        setSelectedMembers(prev => {
+            const current = prev[group] || [];
+            const updated = current.includes(userId)
+                ? current.filter(id => id !== userId)
+                : [...current, userId];
+            return { ...prev, [group]: updated };
+        });
+    };
+
+    const toggleAllMembers = (group: string) => {
+        const members = groupMembers[group] || [];
+        const selected = selectedMembers[group] || [];
+        const allSelected = selected.length === members.length;
+        setSelectedMembers(prev => ({
+            ...prev,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            [group]: allSelected ? [] : members.map((m: any) => m.id),
         }));
     };
 
@@ -264,6 +346,47 @@ export default function MessagesPage() {
                                             </button>
                                         ))}
                                     </div>
+
+                                    {/* Member selection panels for each selected group */}
+                                    {form.recipientGroups.map(group => (
+                                        <div key={group} className="member-select-panel">
+                                            <div className="member-select-header">
+                                                <span className="member-select-title">👥 Membros — {ROLE_LABELS[group as keyof typeof ROLE_LABELS] || group}</span>
+                                                {(groupMembers[group]?.length || 0) > 0 && (
+                                                    <button type="button" className="member-select-toggle" onClick={() => toggleAllMembers(group)}>
+                                                        {(selectedMembers[group]?.length || 0) === (groupMembers[group]?.length || 0) ? 'Desmarcar todos' : 'Selecionar todos'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {loadingMembers[group] ? (
+                                                <div style={{ padding: '8px 0', fontSize: 13, color: 'var(--text-muted)' }}>Carregando membros...</div>
+                                            ) : (groupMembers[group]?.length || 0) === 0 ? (
+                                                <div style={{ padding: '8px 0', fontSize: 13, color: 'var(--text-muted)' }}>Nenhum membro ativo neste grupo</div>
+                                            ) : (
+                                                <div className="member-checkbox-list">
+                                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                                    {groupMembers[group].map((member: any) => (
+                                                        <label key={member.id} className="member-checkbox">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={(selectedMembers[group] || []).includes(member.id)}
+                                                                onChange={() => toggleMember(group, member.id)}
+                                                            />
+                                                            <span className="member-checkbox-name">{member.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {(groupMembers[group]?.length || 0) > 0 && (
+                                                <div className="member-select-count">
+                                                    {(selectedMembers[group]?.length || 0)} de {groupMembers[group]?.length || 0} selecionados
+                                                    {(selectedMembers[group]?.length || 0) === (groupMembers[group]?.length || 0) && (
+                                                        <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: 11 }}>(grupo inteiro)</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Conteúdo *</label>

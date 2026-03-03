@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import MessageDetailModal from './MessageDetailModal';
 
 function getGreeting() {
     const h = new Date().getHours();
@@ -42,22 +43,28 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (page: string) 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [viewMsg, setViewMsg] = useState<any>(null);
+    const [showAllMessages, setShowAllMessages] = useState(false);
+
+    const fetchDashboard = async () => {
+        try {
+            const res = await api('/api/dashboard');
+            const json = await res.json();
+            if (json.success) setData(json.data);
+        } catch { /* ignore */ }
+        setLoading(false);
+    };
 
     useEffect(() => {
-        (async () => {
-            try {
-                const res = await api('/api/dashboard');
-                const json = await res.json();
-                if (json.success) setData(json.data);
-            } catch { /* ignore */ }
-            setLoading(false);
-        })();
+        fetchDashboard();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [api]);
 
     if (loading) return <div className="loading-overlay"><div className="loading-spinner" /></div>;
     if (!data) return <div className="empty-state"><h3>Erro ao carregar dashboard</h3></div>;
 
-    const { stats, messagesByCategory, messagesByPriority, readStats } = data;
+    const { stats, messagesByCategory, messagesByPriority, readStats, directedMessages } = data;
 
     // Calculate max for chart scaling
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,6 +73,15 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (page: string) 
     const prioMax = Math.max(1, ...((messagesByPriority || []).map((p: any) => p._count.id)));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const readMax = Math.max(1, ...((readStats || []).map((r: any) => r._count.id)));
+
+    // Process directed messages
+    const allDirected = directedMessages || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unreadCount = allDirected.filter((m: any) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        m.recipients?.some((r: any) => r.readAt === null)
+    ).length;
+    const displayedMessages = showAllMessages ? allDirected : allDirected.slice(0, 10);
 
     return (
         <>
@@ -104,6 +120,83 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (page: string) 
                     <div className="stat-value">{stats.activeUsers}</div>
                     <div className="stat-label">Usuários Ativos</div>
                 </div>
+            </div>
+
+            {/* Directed Messages Feed */}
+            <div className="card dashboard-message-feed">
+                <div className="dashboard-feed-header">
+                    <div className="dashboard-feed-title">
+                        📬 Mensagens Direcionadas
+                        {unreadCount > 0 && <span className="dashboard-feed-count">{unreadCount} não lida{unreadCount > 1 ? 's' : ''}</span>}
+                    </div>
+                </div>
+
+                {allDirected.length === 0 ? (
+                    <div className="dashboard-feed-empty">
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                        Nenhuma mensagem direcionada
+                    </div>
+                ) : (
+                    <>
+                        <div className="dashboard-msg-list">
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            {displayedMessages.map((msg: any) => {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const isUnread = msg.recipients?.some((r: any) => r.readAt === null);
+                                const prioClass =
+                                    msg.prioridade === 'CRITICA' ? 'prio-critica' :
+                                        msg.prioridade === 'URGENTE' ? 'prio-urgente' : '';
+
+                                return (
+                                    <div
+                                        key={msg.id}
+                                        className={`dashboard-msg-card ${isUnread ? 'unread' : ''} ${prioClass}`}
+                                        onClick={() => setViewMsg(msg)}
+                                    >
+                                        <div className="dashboard-msg-avatar">
+                                            {msg.remetente?.name?.charAt(0)}
+                                        </div>
+                                        <div className="dashboard-msg-body">
+                                            <div className="dashboard-msg-top">
+                                                <span className="dashboard-msg-sender">
+                                                    {msg.remetente?.name}
+                                                    <span className={`badge-role badge-${msg.remetente?.role}`} style={{ marginLeft: 6, fontSize: 10 }}>{msg.remetente?.role}</span>
+                                                </span>
+                                                <span className="dashboard-msg-time">
+                                                    {isUnread && <span className="dashboard-msg-unread-dot" />}
+                                                    {new Date(msg.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                            <div className="dashboard-msg-preview">{msg.conteudo?.substring(0, 120)}</div>
+                                            <div className="dashboard-msg-meta">
+                                                <span className={`badge badge-${msg.prioridade === 'CRITICA' ? 'danger' : msg.prioridade === 'URGENTE' ? 'warning' : 'neutral'}`}>{msg.prioridade}</span>
+                                                <span className="badge badge-accent">{msg.categoria}</span>
+                                                {msg.paciente && <span className="badge badge-neutral">🦷 {msg.paciente}</span>}
+                                                {isUnread && <span className="badge badge-warning">Não lida</span>}
+                                                {msg._count?.attachments > 0 && <span className="badge badge-neutral">📎 {msg._count.attachments}</span>}
+                                                {msg._count?.editHistory > 0 && <span className="badge badge-warning" style={{ fontSize: 10 }}>ALTERADA</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {allDirected.length > 10 && !showAllMessages && (
+                            <div className="dashboard-feed-more">
+                                <button onClick={() => setShowAllMessages(true)}>
+                                    Ver todas ({allDirected.length} mensagens)
+                                </button>
+                            </div>
+                        )}
+                        {showAllMessages && allDirected.length > 10 && (
+                            <div className="dashboard-feed-more">
+                                <button onClick={() => setShowAllMessages(false)}>
+                                    Mostrar menos
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Charts Row */}
@@ -230,6 +323,11 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (page: string) 
                     </button>
                 </div>
             </div>
+
+            {/* View Message Modal */}
+            {viewMsg && (
+                <MessageDetailModal message={viewMsg} onClose={() => { setViewMsg(null); fetchDashboard(); }} api={api} onRead={() => { fetchDashboard(); }} />
+            )}
         </>
     );
 }

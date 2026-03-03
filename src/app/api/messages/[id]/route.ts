@@ -22,6 +22,9 @@ export async function GET(
                 remetente: {
                     select: { id: true, name: true, role: true, email: true, phone: true },
                 },
+                cancelledBy: {
+                    select: { id: true, name: true, role: true },
+                },
                 recipients: {
                     include: {
                         user: { select: { id: true, name: true, role: true } },
@@ -166,17 +169,17 @@ export async function PUT(
     }
 }
 
-// DELETE /api/messages/[id] - Delete message (admin/diretoria only)
+// DELETE /api/messages/[id] - Cancel message (author, admin, or diretoria)
 export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const currentUser = getUserFromRequest(request);
-        if (!currentUser || !isAdminOrDiretoria(currentUser.role)) {
+        if (!currentUser) {
             return NextResponse.json(
-                { success: false, error: 'Acesso restrito a administrador/diretoria' },
-                { status: 403 }
+                { success: false, error: 'Não autorizado' },
+                { status: 401 }
             );
         }
 
@@ -187,26 +190,47 @@ export async function DELETE(
             return NextResponse.json({ success: false, error: 'Mensagem não encontrada' }, { status: 404 });
         }
 
+        // Check permissions: author can remove own message, admin/diretoria can remove any
+        const isAuthor = message.remetenteId === currentUser.userId;
+        const hasPrivilege = isAdminOrDiretoria(currentUser.role);
+
+        if (!isAuthor && !hasPrivilege) {
+            return NextResponse.json(
+                { success: false, error: 'Sem permissão para remover esta mensagem. Apenas o autor, administradores e diretores podem remover.' },
+                { status: 403 }
+            );
+        }
+
+        const now = new Date();
+
         await prisma.message.update({
             where: { id },
-            data: { status: 'CANCELADA' },
+            data: {
+                status: 'CANCELADA',
+                cancelledById: currentUser.userId,
+                cancelledAt: now,
+            },
         });
+
+        const roleLabel = hasPrivilege && !isAuthor
+            ? `privilégio ${currentUser.role.toLowerCase()}`
+            : 'autor';
 
         await createAuditLog({
             userId: currentUser.userId,
             action: 'MESSAGE_DELETED',
             entityType: 'MESSAGE',
             entityId: id,
-            details: `Mensagem cancelada por ${currentUser.name}`,
+            details: `Mensagem cancelada por ${currentUser.name} (${roleLabel}) em ${now.toLocaleString('pt-BR')}`,
             ipAddress: getClientIP(request),
         });
 
         return NextResponse.json({
             success: true,
-            message: 'Mensagem cancelada com sucesso',
+            message: 'Mensagem removida com sucesso',
         });
     } catch (error) {
         console.error('Delete message error:', error);
-        return NextResponse.json({ success: false, error: 'Erro ao cancelar mensagem' }, { status: 500 });
+        return NextResponse.json({ success: false, error: 'Erro ao remover mensagem' }, { status: 500 });
     }
 }
