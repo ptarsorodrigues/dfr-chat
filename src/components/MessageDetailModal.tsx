@@ -120,6 +120,130 @@ export default function MessageDetailModal({ message, onClose, api, onRead, onMe
     const isImageType = (fileType: string) => fileType.startsWith('image/');
     const isPdfType = (fileType: string) => fileType === 'application/pdf';
 
+    // --- Thread content parser & renderer ---
+
+    const renderThreadedContent = (content: string) => {
+        if (!content) return null;
+
+        // Parse content into segments: direct text, quoted headers, and quoted lines
+        const lines = content.split('\n');
+        interface Segment {
+            type: 'text' | 'header' | 'quoted' | 'forward-header';
+            content: string;
+            depth: number;
+        }
+        const segments: Segment[] = [];
+
+        for (const line of lines) {
+            // Check for forward tag
+            const forwardMatch = line.match(/^\[Encaminhada\]\s*(.*)/);
+            if (forwardMatch) {
+                segments.push({ type: 'forward-header', content: forwardMatch[1] || '', depth: 0 });
+                continue;
+            }
+
+            // Check for quoted header: --- Mensagem original de X em Y ---
+            const headerMatch = line.match(/^---\s*Mensagem original de (.+?) em (.+?)\s*---$/);
+            if (headerMatch) {
+                segments.push({ type: 'header', content: `${headerMatch[1]} • ${headerMatch[2]}`, depth: 1 });
+                continue;
+            }
+
+            // Check for quoted lines (count depth by leading > characters)
+            const quoteMatch = line.match(/^((?:>\s*)+)(.*)/);
+            if (quoteMatch) {
+                const depth = (quoteMatch[1].match(/>/g) || []).length;
+                const text = quoteMatch[2];
+
+                // Check if this quoted line is itself a header
+                const innerHeader = text.match(/^---\s*Mensagem original de (.+?) em (.+?)\s*---$/);
+                if (innerHeader) {
+                    segments.push({ type: 'header', content: `${innerHeader[1]} • ${innerHeader[2]}`, depth: depth + 1 });
+                } else {
+                    segments.push({ type: 'quoted', content: text, depth });
+                }
+                continue;
+            }
+
+            // Regular text
+            segments.push({ type: 'text', content: line, depth: 0 });
+        }
+
+        // Group consecutive segments of the same type and depth
+        interface Block {
+            type: 'text' | 'header' | 'quoted' | 'forward-header';
+            lines: string[];
+            depth: number;
+        }
+        const blocks: Block[] = [];
+        let currentBlock: Block | null = null;
+
+        for (const seg of segments) {
+            if (seg.type === 'header' || seg.type === 'forward-header') {
+                // Headers are always their own block
+                blocks.push({ type: seg.type, lines: [seg.content], depth: seg.depth });
+                currentBlock = null;
+            } else if (currentBlock && currentBlock.type === seg.type && currentBlock.depth === seg.depth) {
+                currentBlock.lines.push(seg.content);
+            } else {
+                currentBlock = { type: seg.type, lines: [seg.content], depth: seg.depth };
+                blocks.push(currentBlock);
+            }
+        }
+
+        // Check if content has any thread structure
+        const hasThreads = blocks.some(b => b.type !== 'text');
+
+        if (!hasThreads) {
+            return (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{content}</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="thread-container" style={{ marginBottom: 16 }}>
+                {blocks.map((block, i) => {
+                    if (block.type === 'forward-header') {
+                        return (
+                            <div key={i} className="thread-forward-tag">
+                                ↪️ Encaminhada
+                            </div>
+                        );
+                    }
+                    if (block.type === 'header') {
+                        return (
+                            <div key={i} className="thread-quote-header" style={{ marginLeft: Math.min((block.depth - 1) * 16, 48) }}>
+                                <span className="thread-quote-icon">💬</span>
+                                <span className="thread-quote-sender">{block.lines[0]}</span>
+                            </div>
+                        );
+                    }
+                    if (block.type === 'quoted') {
+                        return (
+                            <div key={i} className="thread-quoted-block" style={{ marginLeft: Math.min(block.depth * 16, 64) }}>
+                                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: 0 }}>
+                                    {block.lines.join('\n')}
+                                </p>
+                            </div>
+                        );
+                    }
+                    // text
+                    const text = block.lines.join('\n').trim();
+                    if (!text) return null;
+                    return (
+                        <div key={i} className="thread-direct-text">
+                            <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, margin: 0 }}>
+                                {text}
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
     // --- Reply / Forward handlers ---
 
     const resetReplyForward = () => {
@@ -417,9 +541,7 @@ export default function MessageDetailModal({ message, onClose, api, onRead, onMe
                                 {msg.dataConsulta && <div><strong>Data Consulta:</strong> {new Date(msg.dataConsulta).toLocaleDateString('pt-BR')}</div>}
                                 {msg.dataLimite && <div><strong>Data Limite:</strong> {new Date(msg.dataLimite).toLocaleDateString('pt-BR')}</div>}
                             </div>
-                            <div className="card" style={{ marginBottom: 16 }}>
-                                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{msg.conteudo}</p>
-                            </div>
+                            {renderThreadedContent(msg.conteudo)}
 
                             {/* Attachments Section */}
                             {msg.attachments?.length > 0 && (
