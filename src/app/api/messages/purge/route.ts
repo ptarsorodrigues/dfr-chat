@@ -37,13 +37,20 @@ export async function DELETE(request: NextRequest) {
             },
         });
 
-        // Count related audit logs
-        const auditCount = await prisma.auditLog.count({
+        // Get message IDs in range (needed for audit log matching)
+        const messageIdsForCount = await prisma.message.findMany({
+            where: { createdAt: { gte: startDate, lte: endDate } },
+            select: { id: true },
+        });
+        const idsInRange = messageIdsForCount.map(m => m.id);
+
+        // Count related audit logs by entity ID
+        const auditCount = idsInRange.length > 0 ? await prisma.auditLog.count({
             where: {
                 entityType: 'MESSAGE',
-                createdAt: { gte: startDate, lte: endDate },
+                entityId: { in: idsInRange },
             },
-        });
+        }) : 0;
 
         // If not confirmed, return preview only
         if (!confirmed) {
@@ -89,13 +96,13 @@ export async function DELETE(request: NextRequest) {
             });
         }
 
-        // 2. Delete audit logs for messages in the range
-        const deletedAudits = await prisma.auditLog.deleteMany({
+        // 2. Delete audit logs for these specific messages (by entityId)
+        const deletedAudits = idsToDelete.length > 0 ? await prisma.auditLog.deleteMany({
             where: {
                 entityType: 'MESSAGE',
-                createdAt: { gte: startDate, lte: endDate },
+                entityId: { in: idsToDelete },
             },
-        });
+        }) : { count: 0 };
 
         // 3. Delete messages (cascade handles recipients, attachments, edits, pins)
         const deletedMessages = await prisma.message.deleteMany({
