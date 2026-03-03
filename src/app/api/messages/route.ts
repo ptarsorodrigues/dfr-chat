@@ -124,6 +124,8 @@ export async function POST(request: NextRequest) {
             conteudo,
             prioridade = 'NORMAL',
             categoria = 'ADMINISTRATIVO',
+            tipo = 'ORIGINAL',
+            parentMessageId,
             recipientUserIds = [],
             recipientGroups = [],
             attachmentIds = [],
@@ -180,6 +182,8 @@ export async function POST(request: NextRequest) {
                 conteudo,
                 prioridade,
                 categoria,
+                tipo,
+                parentMessageId: parentMessageId || null,
                 remetenteId: currentUser.userId,
                 recipients: {
                     create: recipientEntries,

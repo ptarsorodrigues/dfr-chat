@@ -29,25 +29,29 @@ model User {
 }
 
 model Message {
-  id            String    @id @default(cuid())
-  siso          String?   // Código do paciente (opcional)
-  paciente      String?   // Nome do paciente (opcional)
-  dentistaId    String?   // Dentista específico ou null = todos do grupo
-  dataConsulta  DateTime?
-  dataLimite    DateTime?
-  conteudo      String
-  prioridade    String    @default("NORMAL") // NORMAL, URGENTE, CRITICA
-  categoria     String    @default("ADMINISTRATIVO") // CLINICO, ADMINISTRATIVO, FINANCEIRO
-  status        String    @default("ATIVA") // ATIVA, ARQUIVADA, CANCELADA
-  edited        Boolean   @default(false)
-  remetenteId   String
-  cancelledById String?   // Quem cancelou a mensagem
-  cancelledAt   DateTime? // Quando foi cancelada
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  siso            String?   // Código do paciente (opcional)
+  paciente        String?   // Nome do paciente (opcional)
+  dentistaId      String?   // Dentista específico ou null = todos do grupo
+  dataConsulta    DateTime?
+  dataLimite      DateTime?
+  conteudo        String
+  prioridade      String    @default("NORMAL") // NORMAL, URGENTE, CRITICA
+  categoria       String    @default("ADMINISTRATIVO") // CLINICO, ADMINISTRATIVO, FINANCEIRO
+  status          String    @default("ATIVA") // ATIVA, ARQUIVADA, CANCELADA
+  tipo            String    @default("ORIGINAL") // ORIGINAL, RESPOSTA, ENCAMINHAMENTO
+  edited          Boolean   @default(false)
+  remetenteId     String
+  parentMessageId String?   // Mensagem pai (para respostas e encaminhamentos)
+  cancelledById   String?   // Quem cancelou a mensagem
+  cancelledAt     DateTime? // Quando foi cancelada
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   remetente     User               @relation("SentMessages", fields: [remetenteId], references: [id])
   cancelledBy   User?              @relation("CancelledMessages", fields: [cancelledById], references: [id])
+  parentMessage Message?           @relation("MessageThread", fields: [parentMessageId], references: [id])
+  replies       Message[]          @relation("MessageThread")
   recipients    MessageRecipient[]
   attachments   MessageAttachment[]
   editHistory   MessageEdit[]

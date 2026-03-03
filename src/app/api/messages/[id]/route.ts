@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { getUserFromRequest, isAdminOrDiretoria, getClientIP } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
 
-// GET /api/messages/[id] - Get message details + mark as read
+// GET /api/messages/[id] - Get message details + thread + mark as read
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -16,30 +16,32 @@ export async function GET(
 
         const { id } = await params;
 
-        const message = await prisma.message.findUnique({
-            where: { id },
-            include: {
-                remetente: {
-                    select: { id: true, name: true, role: true, email: true, phone: true },
-                },
-                cancelledBy: {
-                    select: { id: true, name: true, role: true },
-                },
-                recipients: {
-                    include: {
-                        user: { select: { id: true, name: true, role: true } },
-                    },
-                },
-                attachments: {
-                    select: { id: true, fileName: true, fileType: true, fileSize: true, filePath: true },
-                },
-                editHistory: {
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { editedAt: 'desc' },
+        const messageInclude = {
+            remetente: {
+                select: { id: true, name: true, role: true, email: true, phone: true },
+            },
+            cancelledBy: {
+                select: { id: true, name: true, role: true },
+            },
+            recipients: {
+                include: {
+                    user: { select: { id: true, name: true, role: true } },
                 },
             },
+            attachments: {
+                select: { id: true, fileName: true, fileType: true, fileSize: true, filePath: true },
+            },
+            editHistory: {
+                include: {
+                    user: { select: { id: true, name: true } },
+                },
+                orderBy: { editedAt: 'desc' as const },
+            },
+        };
+
+        const message = await prisma.message.findUnique({
+            where: { id },
+            include: messageInclude,
         });
 
         if (!message) {
@@ -67,7 +69,86 @@ export async function GET(
             });
         }
 
-        return NextResponse.json({ success: true, data: message });
+        // Find root of the thread
+        let rootId = message.id;
+        let current = message;
+        while (current.parentMessageId) {
+            rootId = current.parentMessageId;
+            const parent = await prisma.message.findUnique({
+                where: { id: current.parentMessageId },
+                select: { id: true, parentMessageId: true },
+            });
+            if (!parent) break;
+            current = parent as typeof current;
+        }
+
+        // Get all messages in this thread (root + all descendants)
+        const threadMessages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { id: rootId },
+                    { parentMessageId: rootId },
+                    // Also get messages whose parent is in the thread (2nd level)
+                ],
+            },
+            include: {
+                remetente: {
+                    select: { id: true, name: true, role: true, email: true, phone: true },
+                },
+                attachments: {
+                    select: { id: true, fileName: true, fileType: true, fileSize: true },
+                },
+                recipients: {
+                    include: {
+                        user: { select: { id: true, name: true, role: true } },
+                    },
+                },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        // If thread has more levels, fetch recursively
+        const allIds = new Set(threadMessages.map(m => m.id));
+        let hasMore = true;
+        while (hasMore) {
+            const deeper = await prisma.message.findMany({
+                where: {
+                    parentMessageId: { in: Array.from(allIds) },
+                    id: { notIn: Array.from(allIds) },
+                },
+                include: {
+                    remetente: {
+                        select: { id: true, name: true, role: true, email: true, phone: true },
+                    },
+                    attachments: {
+                        select: { id: true, fileName: true, fileType: true, fileSize: true },
+                    },
+                    recipients: {
+                        include: {
+                            user: { select: { id: true, name: true, role: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'asc' },
+            });
+            if (deeper.length === 0) {
+                hasMore = false;
+            } else {
+                deeper.forEach(m => {
+                    allIds.add(m.id);
+                    threadMessages.push(m);
+                });
+            }
+        }
+
+        // Sort all by creation date
+        threadMessages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+        return NextResponse.json({
+            success: true,
+            data: message,
+            thread: threadMessages,
+        });
     } catch (error) {
         console.error('Get message error:', error);
         return NextResponse.json({ success: false, error: 'Erro ao carregar mensagem' }, { status: 500 });
