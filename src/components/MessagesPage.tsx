@@ -443,7 +443,7 @@ export default function MessagesPage() {
 
             {/* View Message Modal */}
             {viewMsg && (
-                <MessageDetailModal message={viewMsg} onClose={() => setViewMsg(null)} api={api} onRead={fetchMessages} />
+                <MessageDetailModal message={viewMsg} onClose={() => setViewMsg(null)} api={api} onRead={fetchMessages} onMessageSent={fetchMessages} />
             )}
         </>
     );
