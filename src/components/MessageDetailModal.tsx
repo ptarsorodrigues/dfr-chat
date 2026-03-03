@@ -324,7 +324,7 @@ export default function MessageDetailModal({ message, onClose, api, onRead, onMe
                                     return (
                                         <div
                                             key={m.id}
-                                            className={`thread-message ${isCurrentMsg ? 'thread-message-active' : ''} ${isCancelled ? 'thread-message-cancelled' : ''}`}
+                                            className={`thread-message ${tipo.cls} ${isCurrentMsg ? 'thread-message-active' : ''} ${isCancelled ? 'thread-message-cancelled' : ''}`}
                                             onClick={() => { if (hasThread && !isCurrentMsg) setExpandedId(expandedId === m.id ? null : m.id); }}
                                             style={{ cursor: hasThread && !isCurrentMsg ? 'pointer' : 'default' }}
                                         >
