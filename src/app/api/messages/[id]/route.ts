@@ -271,7 +271,7 @@ export async function DELETE(
             return NextResponse.json({ success: false, error: 'Mensagem não encontrada' }, { status: 404 });
         }
 
-        // Check permissions: author can remove own message, admin/diretoria can remove any
+        // Check permissions
         const isAuthor = message.remetenteId === currentUser.userId;
         const hasPrivilege = isAdminOrDiretoria(currentUser.role);
 
@@ -280,6 +280,19 @@ export async function DELETE(
                 { success: false, error: 'Sem permissão para remover esta mensagem. Apenas o autor, administradores e diretores podem remover.' },
                 { status: 403 }
             );
+        }
+
+        // Regular users (non-admin/diretoria) can only delete their own messages BEFORE read
+        if (isAuthor && !hasPrivilege) {
+            const readRecipient = await prisma.messageRecipient.findFirst({
+                where: { messageId: id, readAt: { not: null } },
+            });
+            if (readRecipient) {
+                return NextResponse.json(
+                    { success: false, error: 'Esta mensagem já foi lida. Apenas administradores e diretores podem removê-la.' },
+                    { status: 403 }
+                );
+            }
         }
 
         const now = new Date();

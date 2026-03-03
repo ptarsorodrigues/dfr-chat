@@ -50,7 +50,14 @@ export default function MessageDetailModal({ message, onClose, api, onRead, onMe
 
     const canDelete = React.useMemo(() => {
         if (!msg || !user) return false;
-        return msg.remetenteId === user.id || user.role === 'ADMINISTRADOR' || user.role === 'DIRETORIA';
+        const isPrivileged = user.role === 'ADMINISTRADOR' || user.role === 'DIRETORIA';
+        if (isPrivileged) return true;
+        const isAuthor = msg.remetenteId === user.id;
+        if (!isAuthor) return false;
+        // Regular author: can only delete if nobody has read it yet
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const hasBeenRead = msg.recipients?.some((r: any) => r.readAt);
+        return !hasBeenRead;
     }, [msg, user]);
 
     const handleDelete = async () => {
